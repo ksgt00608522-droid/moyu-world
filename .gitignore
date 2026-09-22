@@ -1,0 +1,11 @@
+# 打包产物，随时能重新生成，不进版本库
+dist/
+
+# 临时截图
+tmp-*.png
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+.DS_Store

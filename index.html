@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>魔鱼世界</title>
+<link rel="stylesheet" href="css/theme.css">
+</head>
+<body>
+
+<!-- 创建角色：独立一页，不用指令 -->
+<div id="create-screen" hidden>
+  <div id="create-box">
+    <h1>魔 鱼 世 界</h1>
+    <p class="lead">一个摸鱼用的地方</p>
+    <p class="hint">先给角色起个名字。只能创建一个，想重来要先把存档删掉。</p>
+
+    <label class="field">
+      <span>角色名</span>
+      <input id="create-name" type="text" maxlength="12" autocomplete="off"
+             autocapitalize="off" spellcheck="false" placeholder="最多 12 个字">
+    </label>
+
+    <p id="create-error"></p>
+    <button id="create-go">进入大厅</button>
+  </div>
+</div>
+
+<!-- 游戏主界面 -->
+<div id="app" hidden>
+
+  <header id="topbar">
+    <span id="brand">魔鱼世界</span>
+    <span id="topbar-note"></span>
+    <span id="topbar-save"></span>
+  </header>
+
+  <section id="main">
+
+    <!-- 左栏：玩家自己的东西 -->
+    <div id="rail-left">
+
+      <div class="panel" id="status-panel">
+        <h2>玩家状态</h2>
+        <dl id="status"></dl>
+      </div>
+
+      <!-- 左栏三块：玩家状态 / 状态 / 玩家背包。
+           **没有「技能」块** —— 技能换了入口：主动走「行动 → 释放法术」，
+           主动 + 被动总览走「其他 → 技艺」，弹框比这一小块宽得多。
+           状态块按内容高度（挂几个状态就几行，标签并排、装不下换行），
+           背包吃剩下的空间。 -->
+      <div class="panel" id="buff-panel">
+        <h2>状态</h2>
+        <dl id="buffs"></dl>
+      </div>
+
+      <!-- 背包：物品并排成标签（跟「状态」块同一套排法），点名字开物品详情弹框。
+           **没有「预留」小标签** —— 空背包和"没做的背包"是两回事，
+           挂个「预留」会让人以为这儿还没做完（见 docs/设定/02-玩法循环与操作.md）。
+           dl 里装的是 dd.item，每条一个可点的物品名；空的由 ui.js 换成一句灰提示。 -->
+      <div class="panel" id="bag-panel">
+        <h2>玩家背包</h2>
+        <dl id="bag"></dl>
+      </div>
+
+    </div>
+
+    <!-- 中栏：地图与叙事 -->
+    <div id="center">
+
+      <div id="center-top">
+
+        <div class="panel" id="map-panel">
+          <h2>地图</h2>
+          <pre id="map"></pre>
+        </div>
+
+        <div class="panel" id="tile-panel">
+          <h2>地图点位状态</h2>
+          <dl id="tile"></dl>
+        </div>
+
+      </div>
+
+      <section class="panel" id="log-panel">
+        <h2>记事</h2>
+        <div id="log"></div>
+      </section>
+
+      <footer id="input-bar">
+        <span id="prompt">&gt;</span>
+        <input id="cmd" type="text" autocomplete="off" autocapitalize="off"
+               spellcheck="false" placeholder="输入指令，help 查看全部">
+        <button id="send">发送</button>
+      </footer>
+
+    </div>
+
+    <!-- 右栏：二级操作 + 通用操作。
+         二级操作在上面：它放的是"点了某个东西之后才出现"的后续操作
+         （现在只有对话选项），内容会随情况变长，所以给它上面那块。
+         操作区在下面：内容是固定的那几组通用指令，高度稳定。 -->
+    <div id="rail-right">
+
+      <div class="panel" id="secondary-panel">
+        <h2>二级操作</h2>
+        <dl id="secondary"></dl>
+      </div>
+
+      <div class="panel" id="action-panel">
+        <h2>操作区</h2>
+        <div id="actions"></div>
+      </div>
+
+    </div>
+
+  </section>
+
+</div>
+
+<input id="file-input" type="file" accept=".json,application/json" hidden>
+
+<!-- 模态弹框：释放法术 / 技艺 / 状态详情三处共用。
+     项目里第一次出现浮层，所以这里只有壳，内容全由 js/ui.js 现拼 ——
+     三种内容共用同一套开 / 关规矩（关闭按钮 / 点遮罩 / Esc）。
+
+     #modal-mask 和 #modal-box 是**兄弟**，不是父子：点方框里面不会
+     冒泡到遮罩上，所以"点里面不关、点外面才关"不用额外判断。 -->
+<div id="modal" hidden>
+  <div id="modal-mask" data-modal="close"></div>
+  <div id="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <header id="modal-head">
+      <h2 id="modal-title"></h2>
+      <button id="modal-close" data-modal="close"></button>
+    </header>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script src="js/rng.js"></script>
+<script src="js/rules.js"></script>
+<script src="js/data.js"></script>
+<script src="data/strings.js"></script>
+<script src="data/areas.js"></script>
+<!-- 房间素材一个区域一个文件。新增区域就在这里补一行，
+     顺序不影响结果，但按区域表里的顺序排更好找。 -->
+<script src="data/rooms/hall.js"></script>
+<script src="data/npcs.js"></script>
+<script src="data/quests.js"></script>
+<script src="data/items.js"></script>
+<script src="data/events.js"></script>
+<script src="data/skills.js"></script>
+<script src="data/statuses.js"></script>
+<script src="js/state.js"></script>
+<script src="js/items.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/save.js"></script>
+<script src="js/quests.js"></script>
+<script src="js/talk.js"></script>
+<script src="js/events.js"></script>
+<script src="js/skills.js"></script>
+<script src="js/statuses.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/world.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>

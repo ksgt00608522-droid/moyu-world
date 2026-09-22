@@ -1,0 +1,1123 @@
+/* 魔鱼世界 · 主题
+   换配色只改这里。所有颜色都走变量，不在别处写死。 */
+
+:root {
+  --bg:       #0a0f0d;
+  --panel:    #101815;
+  --panel-2:  #0d1412;
+  --border:   #1e2b26;
+  --border-2: #2b3d35;
+
+  --fg:       #b8cec3;
+  --fg-dim:   #5d7a6c;
+  --fg-faint: #3c5148;
+
+  --accent:   #5ee39a;
+  --door:     #ffb454;
+  --warn:     #ffb454;
+  --danger:   #ff6b6b;
+  --info:     #6cc7ff;
+  --quest:    #ffd166;   /* 任务相关：地图上的角标、点位状态里的任务行 */
+  /* 属性括号明细里「装备值」那一项。原来那套语义色里挑不出合适的 ——
+     装备跟任务（--quest）没关系，跟中性提示（--info）也不是一回事，
+     所以单开一个。装备系统还没做，这个色现在恒为 0。 */
+  --gear:     #c9a0ff;
+
+  /* NPC 的兜底色。正常情况下每个 NPC 的类型都会给一个颜色，
+     渲染时写成格子上的 --npc-color；类型 id 写错时才用这个。 */
+  --npc:      #9fb8ab;
+
+  /* 事件点的兜底色，跟 NPC 是同一套做法（格子上的 --event-color）。 */
+  --event:    #9fb8ab;
+
+  --wall:     #2f4239;
+
+  --radius:   6px;
+  --font: ui-monospace, "Cascadia Mono", Consolas, "Sarasa Mono SC",
+          "Microsoft YaHei Mono", "Microsoft YaHei", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.65;
+  overflow: hidden;
+}
+
+[hidden] { display: none !important; }
+
+button {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--panel-2);
+  border: 1px solid var(--border-2);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+button:hover { border-color: var(--accent); color: var(--accent); }
+button:active { transform: translateY(1px); }
+
+/* ==================== 创建角色页 ==================== */
+
+#create-screen {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+#create-box {
+  width: min(470px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 30px 30px 26px;
+}
+
+#create-box h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 8px;
+  color: var(--accent);
+}
+
+#create-box .lead {
+  margin: 8px 0 22px;
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+
+#create-box .hint {
+  margin: 0 0 22px;
+  color: var(--fg-dim);
+  font-size: 13px;
+  line-height: 1.8;
+  border-left: 2px solid var(--border-2);
+  padding-left: 12px;
+}
+
+.field { display: block; }
+.field > span {
+  display: block;
+  font-size: 12px;
+  color: var(--fg-dim);
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+
+.field input {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--fg);
+  background: var(--panel-2);
+  border: 1px solid var(--border-2);
+  border-radius: 5px;
+  outline: 0;
+}
+
+.field input:focus { border-color: var(--accent); }
+.field input::placeholder { color: var(--fg-faint); }
+
+#create-error {
+  min-height: 20px;
+  margin: 8px 0 10px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+#create-go {
+  width: 100%;
+  padding: 10px;
+  font-size: 15px;
+  letter-spacing: 4px;
+  color: var(--accent);
+  border-color: var(--accent);
+  background: transparent;
+}
+
+#create-go:hover { background: rgba(94, 227, 154, 0.09); }
+
+/* ==================== 游戏主界面 ====================
+
+   骨架（顶栏满宽，下面三栏，左右两栏各自上下分块）：
+
+   ┌──────────────────────────────────────────────────────────────┐
+   │ 魔鱼世界                                      存档：未绑定     │
+   ├──────────┬────────────────────────────────┬──────────────────┤
+   │ 玩家状态  │  地图          │ 地图点位状态    │  二级操作         │
+   │ 名字      │               │（一级：脚下/旁边）│（点开才出现的东西）│
+   │ 生命 灵性 │               │                ├──────────────────┤
+   │ 力量 智力 精神 ← 2 行 3 列 │                │  操作区           │
+   │ 灵巧 幸运 感知   每格两行  │                │  移动/行动/存档/其他│
+   ├──────────┤               │                │                  │
+   │ 状态      │               │                │                  │
+   │ [凝神][中毒] 并排，装不下换行│               │                  │
+   ├──────────┤               │                │                  │
+   │ 玩家背包  ├───────────────┴────────────────┤                  │
+   │ （预留）  │  记事                           │                  │
+   │ ← 吃剩余空间                │               │                  │
+   │          ├─────────────────────────────────┤                  │
+   │          │  输入行                  [发送]  │                  │
+   └──────────┴─────────────────────────────────┴──────────────────┘
+
+   注意：中栏的「记事」横跨「地图 + 地图点位状态」两块的宽度，
+   「输入行」只在中栏底下，不占满全宽。
+
+   右栏上面是二级操作、下面是操作区：二级操作的内容会随情况变长
+   （对话选项一多就长），所以让它吃剩余空间、自己内部滚动。
+
+   左栏只有三块：玩家状态 / 状态 / 玩家背包（**没有「技能」块**，
+   技能走操作区的「释放法术」和「技艺」两个入口）。
+   左栏吃剩余空间的是「玩家背包」—— 状态块按内容高度，
+   状态多了靠**并排换行**往下长，不需要靠拉伸容纳。 */
+
+#app {
+  height: 100%;
+  width: 100%;
+  padding: 8px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+}
+
+#topbar {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+#brand { color: var(--accent); letter-spacing: 4px; }
+#topbar-note { color: var(--fg-faint); font-size: 12px; }
+#topbar-save { margin-left: auto; color: var(--fg-faint); font-size: 12px; }
+
+/* ---------- 三栏骨架 ---------- */
+
+/* 左右两栏宽度跟着窗口走但有上下限：窗口再宽也不会把中栏挤没，
+   窗口窄下来也不会把两侧压到看不清字。
+
+   **左栏的下限比右栏大**，因为它里面有一块 3 列并排的属性明细 ——
+   三列各要装下「(5+1+0+0)」这样一行（11 个字符），
+   窄过 250px 就会横向溢出格子。这一条是量出来的，不是估的：
+   1100×700 下左栏 190px 时每格 52px、文字 58px，正好装不下。 */
+#main {
+  display: grid;
+  grid-template-columns: clamp(250px, 18vw, 300px) minmax(0, 1fr) clamp(180px, 15vw, 260px);
+  gap: 8px;
+  min-height: 0;
+}
+
+#rail-left,
+#rail-right {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+}
+
+/* 左栏：玩家状态 / 状态 / 玩家背包。**没有「技能」块**（见文件头骨架图）。
+   玩家状态按内容高度（名字 + 生命 + 灵性 + 六项属性 2 行 3 列）；
+   状态也按内容高度 —— 挂几个状态就几行，标签并排、装不下换行，
+   所以它**不需要靠拉伸来容纳**（`#buffs` 里还有 overflow-y: auto 兜底）。
+   **玩家背包吃掉剩下的空间**（里面那个虚线框自己留了最小高度，
+   不给它吃余量的话预留块会缩成一条）。
+
+   每块都写 minmax(0, ...)：窗口太矮时能被压下去内部滚动，
+   而不是把整条左栏顶出去。 */
+#rail-left {
+  grid-template-rows:
+    minmax(0, auto)   /* 玩家状态 */
+    minmax(0, auto)   /* 状态（按内容高度，标签并排） */
+    minmax(0, 1fr);   /* 玩家背包（预留）← 吃掉剩余空间 */
+}
+
+/* 右栏：上面二级操作、下面操作区。
+   二级操作的内容会随情况变长（对话选项一多就长），所以让它吃剩余空间、
+   自己内部滚动；操作区是固定的那几组通用指令，按内容高度就好。
+   用 minmax(0, auto) 而不是 auto：窗口太矮时操作区能被压下去内部滚动，
+   而不是把整条右栏顶出去。 */
+#rail-right { grid-template-rows: minmax(0, 1fr) minmax(0, auto); }
+
+#center {
+  display: grid;
+  grid-template-rows: minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  min-height: 0;
+}
+
+/* 地图吃掉剩下的宽度，点位状态按窗口宽给一个窄列 */
+#center-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(118px, 12vw, 190px);
+  gap: 8px;
+  min-height: 0;
+}
+
+/* ---------- 面板通用 ---------- */
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 8px 10px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel > h2 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-dim);
+  letter-spacing: 2px;
+}
+
+/* 标题右边挂的小标签，比如「预留」 */
+.panel > h2 .tag {
+  margin-left: 6px;
+  padding: 0 4px;
+  font-size: 10px;
+  letter-spacing: 0;
+  color: var(--fg-faint);
+  border: 1px solid var(--border-2);
+  border-radius: 3px;
+}
+
+/* 还没做的面板：虚线框加一句灰字，别让人以为是坏了。
+   min-height 是必要的：这块在左栏里按内容高度排，
+   不给最小高度的话虚线框会缩成一行文字那么高，看着像坏了。 */
+.placeholder {
+  flex: 1;
+  min-height: 56px;
+  display: grid;
+  place-items: center;
+  color: var(--fg-faint);
+  font-size: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+}
+
+/* ---------- 地图 ---------- */
+
+/* 等宽字符是"高瘦"的，直接按行高排版会拉成长方形。
+   所以每个格子做成固定宽高的块，宽高都由 --cell 决定，字号由 --fs 决定，
+   两个变量都由 js/ui.js 按面板大小算出来，格子一定是正方形。
+   一行用 flex 排，不用行内块 + 行高：行内块要跟行盒的基线对齐，
+   行盒高度会比格子高出一两个像素，七行叠起来就顶出一条滚动条。 */
+#map {
+  margin: 0;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+  font-size: 22px;      /* 只是兜底，真正生效的是格子上那层 --fs */
+  line-height: 0;
+  display: flex;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+
+/* 居中靠 margin:auto，不靠 justify-content：
+   内容比容器大时 auto 外边距会缩成 0，滚动条正常出现，上边不会被裁。 */
+#map .grid { margin: auto; }
+
+#map .row {
+  display: flex;
+  height: var(--cell, 18px);
+}
+
+#map span {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--cell, 18px);
+  height: var(--cell, 18px);
+  font-size: var(--fs, 13px);
+  line-height: 1;       /* 行盒跟字号等高，不用行高撑格子 */
+  overflow: hidden;     /* 万一行盒比格子高，就地裁掉，别漏出去撑出滚动条 */
+}
+
+/* 墙不画 # 字形，直接用背景色铺满整格 —— 相邻的墙格连成一片，
+   看起来才是"墙"，而不是一排井号。 */
+#map .wall  { color: transparent; background: var(--wall); }
+#map .floor { color: transparent; }
+/* 门格：淡橙底 + 一个「门」字。
+   字是汉字、满宽，照 --fs 那么大会贴着格子边，所以单独缩一点；
+   底下的色块仍然是满格的，看起来就是"方块里写着门"。 */
+#map .door {
+  color: var(--door);
+  background: rgba(255, 180, 84, 0.16);
+  font-size: calc(var(--cell, 18px) * 0.7);
+  font-weight: 700;
+}
+/* NPC 格：画它自己的图标字（跟名字分开定义的那个），
+   颜色由类型表给 —— 渲染时写在格子上的 --npc-color，这里只管怎么用。
+   汉字是满宽的，跟门一样缩一点，不然会贴着格子边。
+
+   **外面套一圈类型色的框**，跟玩家格一个做法（inset 阴影，不占布局）。
+   一是跟玩家分得开，二是它现在挡路了，有框才看得出"这儿站着个人、过不去"。 */
+#map .npc {
+  position: relative;   /* 给右上角那个角标当定位基准 */
+  color: var(--npc-color, var(--npc));
+  box-shadow: inset 0 0 0 2px var(--npc-color, var(--npc));
+  border-radius: 3px;
+  font-size: calc(var(--cell, 18px) * 0.7);
+  font-weight: 700;
+}
+
+/* 身上还有能接 / 能交的任务 → 右上角一个小方块。
+   用 ::after 而不是多塞一个元素：地图是拼 innerHTML 出来的，
+   少一个元素少一次拼接，也不会有"它能不能点"的疑问。 */
+#map .npc.has-quest::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: calc(var(--cell, 18px) * 0.24);
+  height: calc(var(--cell, 18px) * 0.24);
+  min-width: 4px;
+  min-height: 4px;
+  background: var(--quest);
+  border-bottom-left-radius: 2px;
+}
+
+/* 事件点格：画它自己的图标字（跟名字分开定义的那个），
+   颜色由类型表给 —— 渲染时写在格子上的 --event-color。
+
+   跟 NPC 长得像，但有两点不一样：
+     1. **不挡路**，玩家可以走上去，所以玩家站在上面时这一格画的是玩家的字
+        （渲染时玩家优先，事件点退到点位状态面板里讲）；
+     2. 没揭开的时候**只画一个空框**（见下面 .hidden）。 */
+#map .event {
+  color: var(--event-color, var(--event));
+  box-shadow: inset 0 0 0 2px var(--event-color, var(--event));
+  border-radius: 3px;
+  font-size: calc(var(--cell, 18px) * 0.7);
+  font-weight: 700;
+}
+
+/* 还没揭开的触发型事件点：有边框、没字 —— 玩家知道"这儿有东西"，
+   但不知道是什么。
+
+   用**虚线**而不是实线，跟已经揭开的那种一眼分得开；
+   outline + 负 offset 画在格子内侧，不占布局（跟 inset 阴影一个道理）。
+   整格半透明是安全的：这一格本来就没有字，只有框。 */
+#map .event.hidden {
+  box-shadow: none;
+  outline: 1px dashed var(--event-color, var(--event));
+  outline-offset: -2px;
+  opacity: .55;
+}
+
+/* 玩家那一格：画名字的第一个字，外面套一圈绿框。
+   框用 inset 阴影而不是 border —— 完全不影响布局，格子宽高不会被挤动。
+   有框才分得开：将来地图上出现别的角色、或者某个东西正好也叫这个字，
+   一眼还能认出哪个是自己。 */
+#map .me {
+  color: var(--accent);
+  background: rgba(94, 227, 154, 0.14);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  border-radius: 3px;
+  /* 汉字是满宽的，照 --fs 那么大会顶到框上，缩一点留出边距 */
+  font-size: calc(var(--cell, 18px) * 0.62);
+  font-weight: 700;
+}
+
+/* 四邻中走得通的格子可以点，鼠标一悬停就亮起来，提示"这儿能走" */
+#map span.walk { cursor: pointer; }
+#map span.walk:hover        { background: rgba(94, 227, 154, 0.18); }
+#map span.door.walk:hover   { background: rgba(255, 180, 84, 0.36); }
+
+/* ---------- 状态面板 ---------- */
+
+#status {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  font-size: 13px;
+  align-content: start;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+#status dt { color: var(--fg-dim); }
+#status dd { margin: 0; color: var(--fg); }
+
+/* 六项属性：**2 行 3 列**，横跨整行（前几行是"标签 + 值"两列，
+   这一块自己是一个三列的格子）。
+   排 2×3 而不是 6×1，是为了把省下来的纵向空间留给下面的「状态」块 ——
+   那一块的内容是会变的（挂几个状态不定）。 */
+#status dd.attrs {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px 5px;
+}
+
+/* 一格属性：两行。上面「名字 + 总值」，下面括号明细。 */
+#status .attr { min-width: 0; }
+
+#status .attr-head {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+#status .attr-name { color: var(--fg-dim); font-size: 12px; }
+#status .attr-total { color: var(--fg); font-weight: 700; }
+
+/* 括号明细：固定四项、顺序固定（基础 + 被动 + 状态 + 装备），各一种颜色。
+   显示的是**惩罚后的实际贡献**，所以四项相加 ≈ 上面的总值，玩家能自己核对。
+   不换行 —— 换行了就跟上面那一行看串了；装不下由冒烟测试盯着。 */
+#status .attr-parts {
+  color: var(--fg-faint);
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+#status .attr-parts .p-base    { color: var(--fg-dim); }
+#status .attr-parts .p-passive { color: var(--accent); }
+#status .attr-parts .p-status  { color: var(--info); }
+#status .attr-parts .p-gear    { color: var(--gear); }
+
+/* 受生命惩罚时，**每一格的总值**变 warn 色 —— 让玩家一眼看出"现在被削了"。
+   惩罚是实时算的（力量 10 → 8 → 回到 60% 以上又变回 10），
+   所以这里只换颜色，数字本身是渲染时算出来的。
+
+   **括号明细不变色** —— 它本来就是彩色的，再整体染一遍就看不出四段了。
+   惩罚到底削了多少，看明细里「基础」「被动」两项比平时小就知道。 */
+#status .attr.warn .attr-total { color: var(--warn); }
+
+/* 生命 / 灵性那一行：百分比 + 细进度条。
+   条自己撑满剩余宽度、数字固定在最右边，这样两行的数字是对齐的。
+   条宽是内联 style 写上去的（数值每帧在变，走 CSS 变量反而更绕）。 */
+#status dd.meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#status .bar {
+  flex: 1;
+  min-width: 24px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+#status .bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+#status .pct {
+  flex: none;
+  color: var(--fg-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+#status dd.meter.hp .bar i  { background: var(--danger); }
+#status dd.meter.ess .bar i { background: var(--info); }
+
+/* ---------- 左栏标签云：状态 / 玩家背包 ----------
+
+   两块是**同一套排法**：`flex-wrap` + 每个标签只占自己文字那么宽。
+   一个东西占满一整行太浪费 —— 左栏本来就窄，名字通常两三个字，
+   一行放一个的话右边全是空白。装不下自动换到下一行，多了自己往下长，
+   比"一行一个"省一半高度。
+
+   `overflow-y: auto` 是兜底：多到面板装不下时内部滚动，
+   而不是把左栏顶出去（外层是 `minmax(0, auto)`，能被压下去）。 */
+:is(#buffs, #bag) {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px 6px;
+  font-size: 13px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+:is(#buffs, #bag) dd { margin: 0; color: var(--fg); }
+
+/* 正负面只影响配色，逻辑上没区别 —— 见 docs/设定/06-物品与技能.md。 */
+#buffs dd.good { color: var(--accent); }
+#buffs dd.bad  { color: var(--danger); }
+
+/* 背包标签的颜色来自分类表（`itemKinds[].color`），渲染时写成标签上的
+   `--item-color`。分类 id 写错时不给这个变量，走兜底色，至少还看得见 ——
+   跟地图上的 NPC / 事件点同一个做法。 */
+#bag dd.item { color: var(--item-color, var(--fg)); }
+
+/* **名字本身是个按钮** —— 点开弹框看详情（描述 / 数量 / 使用）。
+   光看名字看不出还剩几步、到底改了什么、能不能用，所以名字就是入口。
+   状态和背包共用这一套。
+
+   `white-space: nowrap` 是必须的：不加的话名字会在标签内部折行，
+   标签高度就参差了。宽度由内容决定（**不要写 `width: 100%`**，
+   那样又变回"一行一个"）。 */
+:is(#buffs, #bag) dd > button {
+  padding: 1px 6px;
+  font-size: 13px;
+  color: inherit;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+}
+
+:is(#buffs, #bag) dd > button:hover {
+  color: inherit;
+  border-color: var(--border-2);
+  background: var(--panel-2);
+}
+
+/* 闲着的时候：一句灰提示，居中。跟二级操作同一套做法。 */
+:is(#buffs, #bag).idle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+:is(#buffs, #bag) dd.idle {
+  color: var(--fg-faint);
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 0 6px;
+}
+
+/* ---------- 地图点位状态（一级）/ 二级操作 ---------- */
+
+/* 两块共用同一套样式：都是窄栏里的 dl，字号一样、缩进一样。
+   区别只在内容 ——
+     #tile      中栏，讲"脚下这一格 + 旁边站着谁"，还带门和事件点的按钮；
+     #secondary 右栏，讲"点了上面那个按钮之后能做什么"（现在只有对话选项）。
+   一级区只列人（名字 + 态度 + 说话按钮），对话的台词和选项全在二级区，
+   所以两块不会同时画同一份东西。 */
+
+/* 这一栏很窄，所以标签压在值上面竖着排，横排会挤成一条缝 */
+:is(#tile, #secondary) {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+  font-size: 12px;
+}
+
+:is(#tile, #secondary) dt {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--fg-faint);
+  letter-spacing: 1px;
+}
+
+:is(#tile, #secondary) dt:first-child { margin-top: 0; }
+
+:is(#tile, #secondary) dd {
+  margin: 1px 0 0;
+  color: var(--fg);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+:is(#tile, #secondary) dd.door { color: var(--door); }
+:is(#tile, #secondary) dd.dim  { color: var(--fg-dim); }
+
+/* 一级区里「旁边的人」那一块：名字 + 类型 · 态度。
+   （说话时的抬头不走这套 —— 它是一行 dt.talk-head，见本文件末尾。） */
+:is(#tile, #secondary) dd.npc-name {
+  color: var(--npc-color, var(--npc));
+  font-weight: 700;
+}
+
+:is(#tile, #secondary) dd.npc-meta {
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+/* 他刚说的那一句。左边竖一道线，跟上面的属性行分开。 */
+:is(#tile, #secondary) dd.talk-line {
+  margin-top: 6px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+  color: var(--fg);
+}
+
+/* 任务的进度行。三档颜色分得开：
+   进行中 = 暗（只是信息）；可以交差了 = 金色（提醒你去做正事）；
+   已完成 = 更暗（退到背景里）。 */
+:is(#tile, #secondary) dd.npc-quest      { color: var(--fg-dim);   font-size: 12px; }
+:is(#tile, #secondary) dd.npc-quest.ready { color: var(--quest); }
+:is(#tile, #secondary) dd.npc-quest.done  { color: var(--fg-faint); }
+
+/* 脚下的事件点（「地上」那一块）。只有站在上面时才画 ——
+   跟门、跟人一个做法：动作属于哪个东西，按钮就跟着那个东西出现。 */
+:is(#tile, #secondary) dd.event-name {
+  color: var(--event-color, var(--event));
+  font-weight: 700;
+}
+
+:is(#tile, #secondary) dd.event-meta {
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+:is(#tile, #secondary) dd.event-desc {
+  color: var(--fg-dim);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* 站在门上 / 站在人旁边 / 说话时冒出来的按钮。
+   进入用门色（橙），对话选项分两种：任务相关用金色（跟角标一个色系），
+   闲聊和结束用中性色 —— 一眼分得出哪个是正事。
+
+   act  = 单个动作（进入这扇门 / 跟某某说话），一个 dd 一个按钮；
+   acts = 一串选项（对话面板），一个 dd 里排一列按钮 ——
+          选项多的时候能省下每个 dd 的外边距，不至于把面板撑出滚动条。 */
+:is(#tile, #secondary) dd.act { margin-top: 10px; }
+
+:is(#tile, #secondary) dd.acts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* 两块面板里的按钮。
+   **别写成 `#tile, #secondary dd.act button`** —— 那不是一个选择器，
+   而是两条：裸的 `#tile` 和 `#secondary dd.act button`。
+   结果是规则落到整个 dl 上，而 `#tile` 里的按钮反而一条都没选到。
+   （改这一轮时踩过一次：门那个「进入这扇门」按钮的颜色和宽度一起丢了，
+   冒烟测试才逮住。同样的坑在下面那些一行式规则上也存在过。）
+   要"两块面板"就写 :is(...)，它取参数里最高的权重，
+   跟手写两条 `#tile xxx, #secondary xxx` 完全等价。 */
+:is(#tile, #secondary) dd.act button,
+:is(#tile, #secondary) dd.acts button {
+  width: 100%;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--door);
+  border-color: rgba(255, 180, 84, 0.5);
+  background: rgba(255, 180, 84, 0.1);
+}
+
+:is(#tile, #secondary) dd.act button.talk,
+:is(#tile, #secondary) dd.acts button.talk {
+  color: var(--accent);
+  border-color: rgba(94, 227, 154, 0.45);
+  background: rgba(94, 227, 154, 0.08);
+}
+
+:is(#tile, #secondary) dd.act button.quest,
+:is(#tile, #secondary) dd.acts button.quest {
+  color: var(--quest);
+  border-color: rgba(255, 209, 102, 0.5);
+  background: rgba(255, 209, 102, 0.1);
+}
+
+:is(#tile, #secondary) dd.act button.ghost,
+:is(#tile, #secondary) dd.acts button.ghost {
+  color: var(--fg-dim);
+  border-color: var(--border);
+  background: transparent;
+}
+
+/* 互动按钮（"喝一口" / "抠出来"）用**事件点自己的类型色**，
+   所以它跟上面那块「地上」是一套颜色。--event-color 由渲染时写在
+   dd.act 上，按钮继承下来 —— 跟 NPC 那套是同一个做法。 */
+:is(#tile, #secondary) dd.act button.use,
+:is(#tile, #secondary) dd.acts button.use {
+  color: var(--event-color, var(--accent));
+  border-color: var(--event-color, var(--accent));
+  background: transparent;
+}
+
+:is(#tile, #secondary) dd.act button.use:hover,
+:is(#tile, #secondary) dd.acts button.use:hover {
+  background: rgba(184, 206, 195, 0.18);
+}
+
+:is(#tile, #secondary) dd.act button:hover,
+:is(#tile, #secondary) dd.acts button:hover {
+  color: var(--door);
+  border-color: var(--door);
+  background: rgba(255, 180, 84, 0.24);
+}
+
+/* 一级区里"当前正在说话的那个人"。只换颜色、不挪位置 ——
+   一级区永远列着旁边所有人，点另一个人的按钮就直接切过去，
+   不用先按「结束对话」。所以它是一行提示，不是一次跳转。
+
+   这条必须排在上面的 button.talk / button:hover 之后：
+   选择器权重一样（都是 #id + 两个类 + 两个类型），靠后来者居上。 */
+#tile dd.act button.cur {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(94, 227, 154, 0.2);
+}
+
+/* 二级操作的抬头：「正在跟某某说话」。
+   名字用类型色，跟一级区那个名字是同一套颜色 —— 眼睛能对上。 */
+:is(#tile, #secondary) dt.talk-head span { color: var(--npc-color, var(--npc)); }
+
+/* 二级操作闲着的时候：一句灰提示，居中。
+   面板挺高、内容只有一行，贴顶会显得像坏了。 */
+#secondary.idle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#secondary dd.idle {
+  color: var(--fg-faint);
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 0 6px;
+}
+
+/* ---------- 操作面板 ---------- */
+
+#actions {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+
+#actions .group { margin-bottom: 10px; }
+#actions .group:last-child { margin-bottom: 0; }
+
+#actions h3 {
+  margin: 0 0 5px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-faint);
+  letter-spacing: 1px;
+}
+
+#actions .btns { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* 移动组排成方向盘。四个方向键按物理位置摆，
+   手不用看就知道哪个是哪个 —— 排成一行反而要想一下。 */
+#actions .pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  width: 138px;
+  margin: 0 auto;
+}
+
+#actions .pad button {
+  min-width: 0;
+  padding: 7px 0;
+  font-size: 15px;
+  line-height: 1;
+}
+
+#actions .pad button[data-cmd="up"]    { grid-area: 1 / 2; }
+#actions .pad button[data-cmd="left"]  { grid-area: 2 / 1; }
+#actions .pad button[data-cmd="down"]  { grid-area: 2 / 2; }
+#actions .pad button[data-cmd="right"] { grid-area: 2 / 3; }
+
+#actions button {
+  min-width: 46px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+#actions button.danger { color: var(--fg-dim); border-color: var(--border); }
+#actions button.danger:hover { color: var(--danger); border-color: var(--danger); }
+
+/* ---------- 记事 ---------- */
+
+#log {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+
+#log p {
+  margin: 0 0 3px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+#log .sys   { color: var(--fg-dim); }
+#log .ok    { color: var(--accent); }
+#log .warn  { color: var(--warn); }
+#log .err   { color: var(--danger); }
+#log .info  { color: var(--info); }
+#log .echo  { color: var(--fg-faint); }
+#log .title { color: var(--accent); letter-spacing: 2px; margin-top: 4px; }
+
+/* ---------- 输入区 ---------- */
+
+#input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+/* 两种模式：走路模式键盘归游戏，命令模式键盘归输入框。
+   边框和提示符的亮度不一样，一眼能看出现在按字会不会被吃进输入框。 */
+#input-bar.walk { border-color: var(--border); }
+#input-bar.walk #prompt { color: var(--fg-faint); }
+#input-bar.walk #cmd::placeholder { color: var(--fg-faint); }
+
+#input-bar:not(.walk) { border-color: rgba(94, 227, 154, 0.5); }
+#input-bar:not(.walk) #prompt { color: var(--accent); }
+
+#prompt { color: var(--accent); }
+
+#cmd {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 14px;
+  caret-color: var(--accent);
+}
+
+#cmd::placeholder { color: var(--fg-faint); }
+
+/* ==================== 弹框（模态浮层） ====================
+
+   六处共用：释放法术 / 技艺 / 状态详情 / 物品详情 / 钱包 / 笔记本。
+   项目里第一次出现浮层。
+
+   结构（见 index.html）：一层半透明遮罩 + 居中一个方框。
+   遮罩和方框是**兄弟**而不是父子 —— 点方框里面不会冒泡到遮罩上，
+   所以"点里面不关、点外面才关"不用在 JS 里额外判断。
+
+   三种关法：右上角「关闭」、点遮罩、按 Esc。
+   键盘那条在 main.js 的键盘分发里拦（弹框开着时键盘不给游戏用）。 */
+
+#modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+#modal-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 7, 5, 0.74);
+}
+
+#modal-box {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+}
+
+#modal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+#modal-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+
+#modal-close { margin-left: auto; }
+
+#modal-body {
+  padding: 12px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+
+/* ---------- 弹框里的一条（法术列表 / 技艺总览共用） ---------- */
+
+#modal .m-item {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+  padding: 9px 10px;
+}
+
+#modal .m-item + .m-item { margin-top: 8px; }
+
+#modal .m-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+#modal .m-name { color: var(--fg); font-weight: 700; }
+
+/* 主动 / 被动的小标签，靠右 */
+#modal .m-kind {
+  margin-left: auto;
+  flex: none;
+  padding: 0 5px;
+  font-size: 11px;
+  letter-spacing: 0;
+  border: 1px solid var(--border-2);
+  border-radius: 3px;
+  color: var(--fg-faint);
+}
+#modal .m-kind.active  { color: var(--accent); border-color: rgba(94, 227, 154, 0.4); }
+#modal .m-kind.passive { color: var(--info);   border-color: rgba(108, 199, 255, 0.4); }
+
+#modal .m-desc {
+  margin: 5px 0 0;
+  color: var(--fg-dim);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.6;
+}
+
+#modal .m-meta {
+  margin: 4px 0 0;
+  color: var(--fg-dim);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+#modal .m-act { margin-top: 8px; }
+
+#modal .m-act button {
+  width: 100%;
+  padding: 6px 0;
+  color: var(--accent);
+  border-color: rgba(94, 227, 154, 0.45);
+  background: rgba(94, 227, 154, 0.08);
+}
+
+/* 弹框里的小节标题（技艺总览：主动法术 / 被动技能） */
+#modal .m-section {
+  margin: 14px 0 8px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  color: var(--fg-faint);
+}
+#modal .m-section:first-child { margin-top: 0; }
+
+#modal .m-idle {
+  margin: 0;
+  padding: 22px 0;
+  text-align: center;
+  color: var(--fg-faint);
+  font-size: 12px;
+}
+
+/* 笔记本里两栏各有一句空提示，上下叠着。用大留白（22px）会显得中间空一大块，
+   所以那种"跟在标题后面"的空提示用 slim 收一收。 */
+#modal .m-idle.slim { padding: 10px 0; }
+
+/* ---------- 状态详情：四块（描述 / 剩余量 / 影响 / 计时） ---------- */
+
+#modal .m-block { margin-top: 12px; }
+#modal .m-block:first-child { margin-top: 0; }
+
+#modal .m-label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--fg-faint);
+}
+
+#modal .m-value {
+  margin: 2px 0 0;
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 1.7;
+}
+#modal .m-value.dim { color: var(--fg-dim); }
+
+/* 标题右边那个「正面 / 负面」小标签，配色跟左栏状态名一致 */
+#modal .m-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 5px;
+  font-size: 11px;
+  letter-spacing: 0;
+  vertical-align: 2px;
+  border: 1px solid var(--border-2);
+  border-radius: 3px;
+  color: var(--fg-faint);
+}
+#modal .m-tag.good { color: var(--accent); border-color: rgba(94, 227, 154, 0.4); }
+#modal .m-tag.bad  { color: var(--danger); border-color: rgba(255, 107, 107, 0.4); }
+
+/* ---------- 物品详情：标题上的分类小标签 ---------- */
+
+/* 颜色来自分类表（`itemKinds[].color`），渲染时写成标题上的 `--item-color`。
+   分类 id 写错时不给变量，走兜底色。跟左栏背包标签同一个做法。 */
+#modal .m-tag.kind {
+  color: var(--item-color, var(--fg-faint));
+  border-color: var(--item-color, var(--border-2));
+}
+
+/* ---------- 钱包：余额 ---------- */
+
+/* 一行一种币，标签是币种名、值是数量。数量比普通正文大一点 ——
+   点开钱袋就是为了看这个数，别让它跟描述文字一样大。
+   颜色来自币种表（`moneyTypes[].color`），写成值上的 `--money-color`。 */
+#modal .m-value.money {
+  font-size: 16px;
+  color: var(--money-color, var(--fg));
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 笔记本：任务清单 ---------- */
+
+/* 每条任务右上角那个小标签：进行中写「3 / 5」，达成写「可以交差了」，
+   已完成写「完成 N 次」。达成用金色，跟对话里的任务选项是同一个色 ——
+   "该去交差了"在哪儿都是同一件事。 */
+#modal .m-kind.ready {
+  color: var(--quest);
+  border-color: rgba(255, 209, 102, 0.4);
+}
+
