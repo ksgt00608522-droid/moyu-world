@@ -48,10 +48,10 @@ G.main = (function () {
       needsState: true, run: function () { G.world.useAt(); } },
 
     { name: 'cast',   alias: ['法术', '技能'], btn: '释放法术', group: '行动',
-      desc: '释放一个主动法术。不带参数弹出法术列表，带参数直接放（cast 凝神）',
-      /* **不给 arg**：按钮点出来是"打开列表"，不是"放某一个"——
-         要放哪个由列表里那个「释放」按钮带 data-arg 传回来（见 ui.js 的 spellsHtml）。
-         同一个指令两种行为：不带参数弹列表，带参数直接放。
+      desc: '释放一个主动法术。不带参数弹出法术书（法术标签页），带参数直接放（cast 凝神）',
+      /* **不给 arg**：按钮点出来是"打开法术书"，不是"放某一个"——
+         要放哪个由法术书里那个技能格带 data-arg 传回来（见 ui.js 的 bookCellHtml）。
+         同一个指令两种行为：不带参数打开法术书，带参数直接放。
          打字仍然可以一步到位：cast 凝神 / cast skl_focus。 */
       needsState: true, run: function (args) { doCast(args); } },
 
@@ -85,8 +85,8 @@ G.main = (function () {
       needsState: true, run: function () { G.save.bindFile(); } },
 
     { name: 'arts',   alias: ['技艺'], btn: '技艺', group: '其他',
-      desc: '查看已学的全部技艺（主动法术 + 被动技能，带描述）',
-      needsState: true, run: function () { G.ui.openModal('arts'); } },
+      desc: '打开法术书，翻到「技艺」（被动技能）',
+      needsState: true, run: function () { G.ui.openModal('spellbook', 'passive'); } },
     { name: 'help',   alias: ['?', '帮助'], btn: '帮助', group: '其他', desc: '列出全部指令',
       needsState: false, run: showHelp },
     { name: 'clear',  alias: ['清屏'], btn: '清屏', group: '其他', desc: '清空记事',
@@ -225,7 +225,7 @@ G.main = (function () {
      状态由 G.skills.use 挂上，这里只负责把发生的事写进记事。 */
   function doCast(args) {
     if (!args || !args.length) {
-      G.ui.openModal('spells');
+      G.ui.openModal('spellbook', 'active');
       return;
     }
 

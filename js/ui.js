@@ -41,6 +41,8 @@ G.ui = (function () {
     el.mTitle  = document.getElementById('modal-title');
     el.mBody   = document.getElementById('modal-body');
     el.mClose  = document.getElementById('modal-close');
+    el.mBox    = document.getElementById('modal-box');
+    el.mHead   = document.getElementById('modal-head');
 
     /* 关闭按钮的文案在 strings 里 —— index.html 是静态的，
        写死在那里就等于绕开了"文案全在 data/strings.js"这条规矩。 */
@@ -55,6 +57,17 @@ G.ui = (function () {
       e.preventDefault();
       onNoteClick(t.getAttribute('data-note'), t.getAttribute('data-arg'));
     });
+
+    /* 法术书的控件（底部标签切栏 / 翻页）也走弹框上的独立委托，扫 [data-book]。 */
+    el.modal.addEventListener('click', function (e) {
+      var t = e.target && e.target.closest ? e.target.closest('[data-book]') : null;
+      if (!t) return;
+      if (t.tagName === 'BUTTON') { try { t.blur(); } catch (err) {} }
+      e.preventDefault();
+      onBookClick(t.getAttribute('data-book'), t.getAttribute('data-arg'));
+    });
+
+    /* 书（法术书 / 笔记本）不再支持拖动 —— 居中固定就好。 */
   }
 
   function esc(s) {
@@ -430,13 +443,21 @@ G.ui = (function () {
   var noteSec  = 'active';
   var notePage = 0;
 
+  /* 法术书：当前标签（active 主动 / passive 被动 / prof 专业）+ 页码。 */
+  var bookTab  = 'active';
+  var bookPage = 0;
+
   function modalOpen() { return !!el.modal && el.modal.hidden === false; }
 
   function openModal(kind, arg) {
-    modalKind = kind || 'spells';
+    modalKind = kind || 'spellbook';
     modalArg  = arg == null ? null : arg;
     /* 每次打开笔记本都回到第一栏第一页，别续着上次翻到哪 */
     if (modalKind === 'notebook') { noteSec = 'active'; notePage = 0; }
+    if (modalKind === 'spellbook') {
+      bookTab  = (arg === 'passive' || arg === 'prof') ? arg : 'active';
+      bookPage = 0;
+    }
     /* **先露出来再画** —— renderModal 里有一道"弹框开着才画"的闸，
        顺序反了就会先画一次空内容（写这一轮时踩过）。 */
     el.modal.hidden = false;
@@ -446,12 +467,16 @@ G.ui = (function () {
   function closeModal() {
     if (!el.modal) return;
     el.modal.hidden = true;
+    if (el.mBox) el.mBox.classList.remove('book-mode');
     modalKind = null;
     modalArg  = null;
   }
 
   function renderModal() {
     if (!modalKind || !modalOpen()) return;
+    /* 法术书和笔记本共用同一套"书"外观（book-mode），切换时统一挂 */
+    var isBook = (modalKind === 'spellbook' || modalKind === 'notebook');
+    if (el.mBox) el.mBox.classList.toggle('book-mode', isBook);
     var v = modalView(modalKind, modalArg);
     el.mTitle.innerHTML = v.title;
     if (modalKind === 'notebook') {
@@ -507,77 +532,131 @@ G.ui = (function () {
     return '（' + safe.join('，') + '）';
   }
 
-  /* 技能卡：名字 + 主动/被动 + 描述 +（释放后挂上什么 / 改了什么）。
-     opts.use = true 时多一个「释放」按钮（只有法术列表要）。 */
-  function skillItemHtml(s, opts) {
+  /* —— 法术书：把旧「释放法术」和「技艺」合并成一本书。
+   「释放法术」按钮 → 翻到「法术」（主动），「技艺」按钮 → 翻到「技艺」（被动）。 —— */
+
+  /* 一块羊皮纸页最多放几个技能格。数据还薄，先定宽松些；
+     以后法术多了，调这一个数就能自然翻页。 */
+  var BOOK_PER_PAGE = 8;
+
+  /* 法术书的点击：data-book="tab" 切栏，data-book="page" data-arg=±1 翻页。 */
+  function onBookClick(act, arg) {
+    if (act === 'tab') {
+      bookTab  = (arg === 'passive' || arg === 'prof') ? arg : 'active';
+      bookPage = 0;
+    } else if (act === 'page') {
+      var max = bookPages();
+      bookPage += (arg === '-1') ? -1 : 1;
+      if (bookPage < 0) bookPage = 0;
+      if (bookPage >= max) bookPage = max - 1;
+    } else {
+      return;
+    }
+    renderModal();
+  }
+
+  /* 当前栏（法术 / 技艺）的技能切成几页。 */
+  function bookPages() {
+    var list = G.skills
+      ? (bookTab === 'active' ? G.skills.active() : G.skills.passive())
+      : [];
+    return Math.max(1, Math.ceil(list.length / BOOK_PER_PAGE));
+  }
+
+  /* 法术书整页：底部标签栏 + 羊皮纸页。
+     标签：法术（主动）/ 技艺（被动）/ 专业（还没做，留空占位）。 */
+  function spellbookHtml() {
+    var tabs = [
+      [ 'active',  'modal.book.tab.active'  ],
+      [ 'passive', 'modal.book.tab.passive' ],
+      [ 'prof',    'modal.book.tab.prof'    ]
+    ];
+    var i, t, tb = '<div class="sb-tabs">';
+    for (i = 0; i < tabs.length; i++) {
+      t = bookTab === tabs[i][0];
+      tb += '<button type="button" class="sb-tab' + (t ? ' on' : '') +
+            '" data-book="tab" data-arg="' + tabs[i][0] + '">' +
+            esc(G.data.t(tabs[i][1])) + '</button>';
+    }
+    /* 关闭按钮放在标签栏最右 —— 没有单独的标题条了，书就是"标签 + 纸面" */
+    tb += '<button type="button" class="sb-close" data-modal="close" ' +
+          'title="' + esc(G.data.t('ui.modal.close')) + '">✕</button>';
+    tb += '</div>';
+    return tb + '<div class="spell-sheet">' + bookSheetHtml() + '</div>';
+  }
+
+  /* 羊皮纸页这栏的内容：技能网格，一页放不下就翻页。 */
+  function bookSheetHtml() {
+    if (bookTab === 'prof') {
+      return '<p class="m-idle">' + esc(G.data.t('modal.book.prof.none')) + '</p>';
+    }
+    var list = G.skills
+      ? (bookTab === 'active' ? G.skills.active() : G.skills.passive())
+      : [];
+    if (!list.length) {
+      return '<p class="m-idle">' +
+             esc(G.data.t(bookTab === 'active' ? 'modal.spells.idle' : 'modal.arts.idle')) +
+             '</p>';
+    }
+    var total = Math.ceil(list.length / BOOK_PER_PAGE);
+    if (bookPage >= total) bookPage = total - 1;
+    var start = bookPage * BOOK_PER_PAGE;
+    var end = Math.min(start + BOOK_PER_PAGE, list.length);
+    var html = '<div class="skill-grid">';
+    for (var i = start; i < end; i++) html += bookCellHtml(list[i]);
+    html += '</div>';
+    html += bookPager(total);
+    return html;
+  }
+
+  /* 技能格：一块彩色"符文"占位（字 = 技能名头一个字）+ 名字。
+     悬停浮出说明（描述 + 实打实的效果）。主动格子点一下就施放；
+     被动的偏暗、纯看。数据里没有冷却 / 射程 / 消耗，所以不编假数字，
+     悬停只讲真的有的：它是什么、干了什么。 */
+  function bookCellHtml(s) {
     var active = s.kind === 'active';
-    var st = active ? G.data.status(s.applies) : null;
+    var sigil = esc(s.name.charAt(0));
+    var kind = esc(G.data.t(active ? 'ui.skill.active' : 'ui.skill.passive'));
+    var tip = '<span class="sb-name">' + esc(s.name) + '</span>' +
+              '<span class="sb-kind ' + (active ? 'active' : 'passive') + '">' + kind + '</span>' +
+              (s.desc ? '<p class="sb-desc">' + esc(s.desc) + '</p>' : '') +
+              '<p class="sb-eff">' + bookEffect(s) + '</p>';
+    var inner = '<span class="sb-icon">' + sigil + '</span>' +
+                '<span class="sb-lbl">' + esc(s.name) + '</span>' +
+                '<span class="sb-tip">' + tip + '</span>';
 
-    var html = '<div class="m-item">';
-    html += '<div class="m-head">' +
-              '<span class="m-name">' + esc(s.name) + '</span>' +
-              '<span class="m-kind ' + (active ? 'active' : 'passive') + '">' +
-                esc(G.data.t(active ? 'ui.skill.active' : 'ui.skill.passive')) +
-              '</span>' +
-            '</div>';
-    if (s.desc) html += '<p class="m-desc">' + esc(s.desc) + '</p>';
-
-    /* 主动：说清"释放后挂上什么状态"，以及那个状态改了什么 ——
-       玩家点开列表就是为了决定放哪个，光看名字决定不了。 */
-    if (active) {
-      if (st) {
-        html += '<p class="m-meta">' +
-                  G.data.t('modal.spells.applies',
-                           { name: esc(st.name), extra: effectSuffix(st) }) +
-                '</p>';
-      }
-    } else if ((s.mods || []).length) {
-      html += '<p class="m-meta">' + esc(effectLines(s).join('，')) + '</p>';
-    }
-
-    if (opts && opts.use) {
-      html += '<div class="m-act"><button data-cmd="cast" data-arg="' + esc(s.id) + '">' +
-                esc(G.data.t('modal.spells.use')) + '</button></div>';
-    }
-    return html + '</div>';
+    var color = active ? 'var(--sb-act)' : 'var(--sb-pas)';
+    return active
+      ? '<button type="button" class="skill-cell" data-cmd="cast" data-arg="' + esc(s.id) +
+        '" style="--sc: ' + color + '">' + inner + '</button>'
+      : '<div class="skill-cell dim" style="--sc: ' + color + '">' + inner + '</div>';
   }
 
-  /* 法术列表：**只有主动技能** —— 被动没有"用一下"这个动作。
-     每条带描述和一个「释放」按钮，点下去直接放（走 data-cmd="cast"）。 */
-  function spellsHtml() {
-    var list = G.skills ? G.skills.active() : [];
-    if (!list.length) {
-      return '<p class="m-idle">' + esc(G.data.t('modal.spells.idle')) + '</p>';
+  /* 技能到底干了些啥，一句话：主动说施放后挂什么，被动说改了什么。 */
+  function bookEffect(s) {
+    if (s.kind === 'active') {
+      var st = G.data.status(s.applies);
+      return st
+        ? esc(G.data.t('modal.book.applies', { name: st.name, extra: effectSuffix(st) }))
+        : esc(G.data.t('modal.book.noeffect'));
     }
-    var html = '';
-    for (var i = 0; i < list.length; i++) {
-      html += skillItemHtml(list[i], { use: true });
-    }
-    return html;
+    return (s.mods || []).length
+      ? esc(effectLines(s).join('，'))
+      : esc(G.data.t('modal.book.noeffect'));
   }
 
-  /* 技艺总览：主动 + 被动都列，**纯看，不给按钮** ——
-     要放法术走「释放法术」，这里只回答"我到底会些什么"。 */
-  function artsHtml() {
-    var list = G.skills ? G.skills.owned() : [];
-    if (!list.length) {
-      return '<p class="m-idle">' + esc(G.data.t('modal.arts.idle')) + '</p>';
-    }
-    var active = [], passive = [], i;
-    for (i = 0; i < list.length; i++) {
-      (list[i].kind === 'active' ? active : passive).push(list[i]);
-    }
-
-    var html = '';
-    if (active.length) {
-      html += '<h3 class="m-section">' + esc(G.data.t('modal.arts.active')) + '</h3>';
-      for (i = 0; i < active.length; i++) html += skillItemHtml(active[i]);
-    }
-    if (passive.length) {
-      html += '<h3 class="m-section">' + esc(G.data.t('modal.arts.passive')) + '</h3>';
-      for (i = 0; i < passive.length; i++) html += skillItemHtml(passive[i]);
-    }
-    return html;
+  /* 右下角翻页条：一页装得下就不显示。 */
+  function bookPager(total) {
+    if (total <= 1) return '';
+    return '<div class="sb-pager">' +
+           '<button type="button" class="sb-pg"' +
+           (bookPage <= 0 ? ' disabled' : '') +
+           ' data-book="page" data-arg="-1">‹</button>' +
+           '<span>' + esc(G.data.t('modal.note.pages',
+                       { p: bookPage + 1, total: total })) + '</span>' +
+           '<button type="button" class="sb-pg"' +
+           (bookPage >= total - 1 ? ' disabled' : '') +
+           ' data-book="page" data-arg="1">›</button></div>';
   }
 
   /* 剩余量怎么说，看计时方式 —— "还能走 3 格" / "不会自己消失"。
@@ -796,6 +875,10 @@ G.ui = (function () {
      先铺全部任务量高度，再裁到当前页，最后补翻页条 —— 都在同一次渲染里，
      浏览器只画最后一版，不会有"闪一下整页"的中间态。 */
   function noteRender() {
+    /* 笔记本从渲染这一面就保证自己是"书"外观 —— renderModal 的 toggle
+       是给法术书+笔记本统一挂的，这里再兜一层，免得哪条路径漏挂、
+       纸面退回默认的深色底（就是那个"莫名其妙的黑色背景"）。 */
+    if (el.mBox) el.mBox.classList.add('book-mode');
     var items = noteList(noteSec);
     var shell =
       '<div class="book">' +
@@ -804,6 +887,8 @@ G.ui = (function () {
             '" data-note="sec" data-arg="active">' + esc(G.data.t('modal.note.active')) + '</button>' +
           '<button type="button" class="book-tab' + (noteSec === 'done' ? ' on' : '') +
             '" data-note="sec" data-arg="done">' + esc(G.data.t('modal.note.done')) + '</button>' +
+          '<button type="button" class="sb-close" data-modal="close" ' +
+            'title="' + esc(G.data.t('ui.modal.close')) + '">✕</button>' +
         '</div>' +
         '<div class="book-pages"><div class="book-page"></div></div>' +
         '<div class="book-pager"></div>' +
@@ -849,8 +934,10 @@ G.ui = (function () {
      标题写"状态详情"的话，开着好几个弹框就分不清看的是哪个了。
      物品详情同理，用物品名 + 分类小标签。 */
   function modalView(kind, arg) {
-    if (kind === 'arts') {
-      return { title: esc(G.data.t('modal.arts.title')), html: artsHtml() };
+    /* 法术书：旧的「释放法术」（spells）和「技艺」（arts）都合并到这里。
+       标题前那个📖就是左上角的书本图标。 */
+    if (kind === 'spellbook' || kind === 'spells' || kind === 'arts') {
+      return { title: '📖 ' + esc(G.data.t('modal.book.title')), html: spellbookHtml() };
     }
     if (kind === 'item') {
       var idef = G.data.item(arg);
@@ -870,8 +957,9 @@ G.ui = (function () {
       return { title: esc(G.data.t('modal.wallet.title')), html: walletHtml() };
     }
     if (kind === 'notebook') {
-      /* 正文不在这画 —— renderModal 对笔记本走 noteRender()（要量高度翻页）。 */
-      return { title: esc(G.data.t('modal.note.title')), html: '' };
+      /* 正文不在这画 —— renderModal 对笔记本走 noteRender()（要量高度翻页）。
+         标题带📖，跟法术书同一套书壳。 */
+      return { title: '📖 ' + esc(G.data.t('modal.note.title')), html: '' };
     }
     if (kind === 'buff') {
       var rec = null, list = G.statuses.owned();
@@ -886,7 +974,7 @@ G.ui = (function () {
         html: buffHtml(arg)
       };
     }
-    return { title: esc(G.data.t('modal.spells.title')), html: spellsHtml() };
+    return { title: '📖 ' + esc(G.data.t('modal.book.title')), html: spellbookHtml() };
   }
 
   /* ---------- 地图点位状态 ---------- */

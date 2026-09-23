@@ -1432,15 +1432,23 @@
   T('弹框右上角有关闭按钮，文案来自 strings',
     !!$('modal-close') && $('modal-close').textContent === '关闭');
 
-  /* (1) 技艺总览：主动 + 被动都在，带描述，纯看不能放 */
+  /* (1) 技艺标签 = 法术书的「被动」页：只列被动，带说明，纯看不能放 */
   G.main.submit('arts');
-  T('arts 打开技艺总览', G.ui.modalOpen() && $('modal').hidden === false);
-  T('技艺里有主动法术', modalText().indexOf('凝神') >= 0);
-  T('技艺里有被动技能', modalText().indexOf('铁骨') >= 0);
-  T('技艺里带了技能描述', modalText().indexOf('筋骨结实') >= 0);
-  T('技艺里标出了主动 / 被动',
-    modalText().indexOf('主动') >= 0 && modalText().indexOf('被动') >= 0);
-  T('技艺是纯总览，不给释放按钮', !document.querySelector('#modal button[data-cmd="cast"]'));
+  T('arts 打开法术书并停在「技艺」', G.ui.modalOpen() && $('modal').hidden === false);
+  T('技艺页里有被动技能', modalText().indexOf('铁骨') >= 0);
+  T('技艺页不带主动法术', modalText().indexOf('凝神') < 0);
+  T('技艺页带了技能描述', modalText().indexOf('筋骨结实') >= 0);
+  T('技艺页标出被动', modalText().indexOf('被动') >= 0);
+  T('技艺是纯看的，没有施放按钮', !document.querySelector('#modal button[data-cmd="cast"]'));
+
+  /* 法术标签 = 法术书的「主动」页，能点施放 */
+  document.querySelector('#modal button[data-book="tab"][data-arg="active"]').click();
+  T('切到「法术」页列出主动法术', modalText().indexOf('凝神') >= 0);
+  T('法术页带施放按钮（点了放出去）',
+    !!document.querySelector('#modal button[data-cmd="cast"][data-arg="skl_focus"]'));
+  document.querySelector('#modal button[data-cmd="cast"][data-arg="skl_focus"]').click();
+  T('点法术格子施放出、弹框自关', !G.ui.modalOpen() && G.statuses.has('st_focus'));
+  G.ui.closeModal();
 
   $('modal-close').click();
   T('点「关闭」能关掉弹框', !G.ui.modalOpen() && $('modal').hidden === true);

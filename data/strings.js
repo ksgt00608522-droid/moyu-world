@@ -166,6 +166,14 @@ G.data.strings = {
   "modal.note.times": "完成 {n} 次",
   "modal.note.pages": "第 {p} / {total} 页",
 
+  "modal.book.title": "法术书",
+  "modal.book.tab.active": "法术",
+  "modal.book.tab.passive": "技艺",
+  "modal.book.tab.prof": "专业",
+  "modal.book.prof.none": "什么专业技能都还没学。",
+  "modal.book.applies": "施放后：挂上「{name}」{extra}",
+  "modal.book.noeffect": "不动任何属性。",
+
   "buff.left.step": "还能走 {n} 格",
   "buff.left.time": "还能持续 {n} 秒",
   "buff.left.manual": "不会自己消失，要手动解除",

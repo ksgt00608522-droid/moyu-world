@@ -1103,7 +1103,7 @@ button:active { transform: translateY(1px); }
 /* 纸面：固定默认高度（宽松，约 7 条），超出走翻页，不滚动 */
 #modal .book-pages { padding: 0 12px; }
 #modal .book-page {
-  height: 340px;
+  height: 680px;
   overflow: hidden;
   padding: 12px 6px 0;
   border-radius: 4px 4px 6px 6px;
@@ -1159,6 +1159,251 @@ button:active { transform: translateY(1px); }
 }
 #modal .book-pager button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 #modal .book-pager button:disabled { opacity: 0.35; cursor: default; }
+
+/* ---------- 法术书：皮革封面的羊皮纸书（合并 释放法术 + 技艺） ---------- */
+
+/* 石头一样的外框：棕色皮革 + 内圈烫金。只有法术书用 book-mode。 */
+#modal-box.book-mode {
+  --let:  #4a2f1a;    /* 皮革棕 */
+  --gold: #c8a45c;    /* 烫金 */
+  --sb-act: #b4582e;  /* 主动技能符文色（暖橙） */
+  --sb-pas: #5f6b7a;  /* 被动技能符文色（灰蓝，偏暗） */
+  border: 12px solid var(--let);
+  border-radius: 6px;
+  width: 640px;
+  max-width: 94vw;
+  background: #efe0bd;
+  color: #3a2b1c;
+  box-shadow:
+    inset 0 0 0 3px var(--gold),
+    0 14px 34px rgba(0,0,0,.55);
+  overflow: visible;    /* 悬停提示要能浮到纸面外 */
+}
+#modal-box.book-mode #modal-head {
+  /* 书没有单独的标题条：只留"标签栏 + 纸面"，关闭按钮挪到标签栏右侧了 */
+  display: none;
+}
+#modal-box.book-mode #modal-title { color: #3a2b1c; }
+
+/* 书本的关闭按钮：两颗红 ×，放在各自标签栏的最右侧（没有标题条了）。
+   法术书 / 笔记本都复用 .sb-close 这一个类。 */
+#modal-box.book-mode .sb-close {
+  flex: none;
+  align-self: center;
+  width: 26px; height: 26px;
+  padding: 0;
+  line-height: 1;
+  font-size: 15px;
+  font-weight: 700;
+  color: #c0392b;
+  border: 2px solid rgba(192,57,43,.75);
+  border-radius: 4px;
+  background: rgba(192,57,43,.06);
+  cursor: pointer;
+  font-family: var(--font);
+}
+#modal-box.book-mode .sb-close:hover { background: rgba(192,57,43,.18); border-color: #c0392b; }
+
+/* 右上角书页标签：法术 / 技艺 / 专业 */
+#modal-box.book-mode .sb-tabs {
+  display: flex; gap: 4px;
+  padding: 8px 14px 2px;
+}
+#modal-box.book-mode .sb-tabs .sb-close,
+#modal-box.book-mode .book-tabs .sb-close { margin-left: auto; }
+#modal-box.book-mode .sb-tab {
+  border: 1px solid rgba(74,47,26,.35);
+  background: rgba(74,47,26,.08);
+  color: #5a3c20;
+  border-radius: 6px 6px 0 0;
+  padding: 5px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+#modal-box.book-mode .sb-tab.on {
+  background: #4a2f1a;
+  color: #f3e3c0;
+  border-color: #4a2f1a;
+}
+
+/* 羊皮纸页：中间一道书缝，技能网格铺在上面 */
+#modal-box.book-mode .spell-sheet {
+  position: relative;
+  margin: 0 14px 12px;
+  padding: 14px 16px;
+  min-height: 440px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 30%),
+    linear-gradient(90deg, #e7d3a4, #efe0bd 18%, #efe0bd 82%, #e3cd9c);
+  border: 1px solid rgba(122,84,30,.4);
+  border-radius: 2px;
+  box-shadow:
+    inset 14px 0 18px -16px rgba(0,0,0,.45),
+    inset -14px 0 18px -16px rgba(0,0,0,.35);
+}
+#modal-box.book-mode .spell-sheet::before {   /* 中间那道书缝 */
+  content: '';
+  position: absolute; left: 50%; top: 0; bottom: 0; width: 2px;
+  background: linear-gradient(180deg, rgba(0,0,0,0), rgba(122,84,30,.35) 15%,
+                              rgba(122,84,30,.35) 85%, rgba(0,0,0,0));
+  transform: translateX(-1px);
+}
+
+/* 技能网格：两列 */
+#modal-box.book-mode .skill-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* 技能格 */
+#modal-box.book-mode .skill-cell {
+  position: relative;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(122,84,30,.35);
+  border-radius: 6px;
+  background: rgba(239,224,189,.55);
+  color: #3a2b1c;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+#modal-box.book-mode .skill-cell:hover {
+  border-color: var(--gold);
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+#modal-box.book-mode .skill-cell.dim { cursor: default; opacity: .72; }
+
+/* 符文占位：技能名头一个字 + 主动/被动配色的方块（没有图标素材） */
+#modal-box.book-mode .sb-icon {
+  flex: 0 0 auto;
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 700;
+  color: #fff8ea;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,.35), transparent 55%),
+    var(--sc);
+  border: 1px solid rgba(0,0,0,.25);
+  border-radius: 8px;
+  text-shadow: 0 1px 2px rgba(0,0,0,.6);
+}
+#modal-box.book-mode .sb-lbl { font-weight: 600; }
+
+/* 悬停提示：浮在格子上方的羊皮纸说明 */
+#modal-box.book-mode .sb-tip {
+  display: none;
+  position: absolute; left: 0; top: calc(100% + 8px); z-index: 30;
+  width: 240px;
+  padding: 10px 12px;
+  background: #f7eccd;
+  border: 2px solid #b98f45;
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.45), inset 0 0 0 1px rgba(122,84,30,.3);
+  color: #3a2b1c;
+}
+#modal-box.book-mode .skill-cell:hover .sb-tip { display: block; }
+#modal-box.book-mode .sb-name { font-weight: 700; display: block; }
+#modal-box.book-mode .sb-kind {
+  display: inline-block; margin: 4px 0 6px;
+  padding: 1px 7px; border-radius: 9px; font-size: 12px;
+  color: #f3e3c0;
+}
+#modal-box.book-mode .sb-kind.active { background: #a34a24; }
+#modal-box.book-mode .sb-kind.passive { background: #5f6b7a; }
+#modal-box.book-mode .sb-desc, #modal-box.book-mode .sb-eff { margin: 2px 0; font-size: 13px; }
+#modal-box.book-mode .sb-eff { color: #6b4a26; }
+
+/* 翻页条（右下角） */
+#modal-box.book-mode .sb-pager {
+  display: flex; align-items: center; gap: 10px;
+  justify-content: flex-end;
+  margin-top: 12px;
+  color: #6b4a26;
+  font-size: 13px;
+}
+#modal-box.book-mode .sb-pg {
+  border: 1px solid rgba(74,47,26,.4);
+  background: rgba(74,47,26,.08);
+  color: #4a2f1a;
+  border-radius: 4px;
+  padding: 2px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+#modal-box.book-mode .sb-pg:disabled { opacity: .35; cursor: default; }
+
+/* 笔记本也走 book-mode 时，把里面的书签 / 纸面 / 翻页条改成跟法术书一致的羊皮风格，
+   别让绿蓝书签和深色纸面一件书里出现两种风格。 */
+#modal-box.book-mode .book {
+  /* .book 原本是独立卡片的外壳（深色 --panel 底 + 深色边框），
+     现在整个纸面已经是羊皮布景，这层壳会叠出黑底黑边，直接去掉。 */
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+#modal-box.book-mode .book-tabs {
+  padding: 8px 14px 2px;
+  gap: 4px;
+}
+#modal-box.book-mode .book-tab {
+  top: 0;
+  height: auto;
+  padding: 5px 14px;
+  clip-path: none;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #5a3c20;
+  background: rgba(74,47,26,.08);
+  border: 1px solid rgba(74,47,26,.35);
+  border-radius: 6px 6px 0 0;
+  font-family: var(--font);
+}
+#modal-box.book-mode .book-tab[data-arg="active"],
+#modal-box.book-mode .book-tab[data-arg="done"] {
+  background: rgba(74,47,26,.08);
+  color: #5a3c20;
+}
+#modal-box.book-mode .book-tab.on {
+  background: #4a2f1a;
+  color: #f3e3c0;
+  border-color: #4a2f1a;
+}
+#modal-box.book-mode .book-tab:not(.on) { opacity: 1; filter: none; }
+#modal-box.book-mode .book-tab:not(.on):hover { opacity: .8; }
+
+#modal-box.book-mode .book-pages { padding: 0 14px; }
+#modal-box.book-mode .book-page {
+  height: 680px;
+  border: 1px solid rgba(122,84,30,.4);
+  border-top: 1px solid rgba(122,84,30,.4);
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.4), rgba(255,255,255,0) 30%),
+    linear-gradient(90deg, #e7d3a4, #efe0bd 18%, #efe0bd 82%, #e3cd9c);
+  box-shadow:
+    inset 14px 0 18px -16px rgba(0,0,0,.45),
+    inset -14px 0 18px -16px rgba(0,0,0,.35);
+}
+#modal-box.book-mode .book-page .m-item {
+  color: #3a2b1c;
+  border-top: 1px solid rgba(122,84,30,.18);
+}
+#modal-box.book-mode .book-page .m-item:first-child { border-top: 0; }
+#modal-box.book-mode .book-page .m-kind { background: rgba(74,47,26,.1); color: #5a3c20; }
+
+#modal-box.book-mode .book-pager .page-no { color: #6b4a26; }
+#modal-box.book-mode .book-pager button {
+  border: 1px solid rgba(74,47,26,.4);
+  background: rgba(74,47,26,.08);
+  color: #4a2f1a;
+}
+#modal-box.book-mode .book-pager button:hover:not(:disabled) { border-color: #b98f45; color: #3a2b1c; }
+#modal-box.book-mode .book-pager button:disabled { opacity: .35; }
 
 /* ---------- 状态详情：四块（描述 / 剩余量 / 影响 / 计时） ---------- */
 
