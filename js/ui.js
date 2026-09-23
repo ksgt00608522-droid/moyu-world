@@ -45,6 +45,16 @@ G.ui = (function () {
     /* 关闭按钮的文案在 strings 里 —— index.html 是静态的，
        写死在那里就等于绕开了"文案全在 data/strings.js"这条规矩。 */
     el.mClose.textContent = G.data.t('ui.modal.close');
+
+    /* 笔记本自己的控件（书签切栏 / 翻页）不走 main 的 data-cmd 委托，
+       在弹框上单独接一个委托，扫 `[data-note]`。 */
+    el.modal.addEventListener('click', function (e) {
+      var t = e.target && e.target.closest ? e.target.closest('[data-note]') : null;
+      if (!t) return;
+      if (t.tagName === 'BUTTON') { try { t.blur(); } catch (err) {} }
+      e.preventDefault();
+      onNoteClick(t.getAttribute('data-note'), t.getAttribute('data-arg'));
+    });
   }
 
   function esc(s) {
@@ -415,11 +425,18 @@ G.ui = (function () {
   var modalKind = null;
   var modalArg  = null;
 
+  /* 笔记本内部：当前看哪一栏（书签）、当前第几页。是"点开看"，
+     不随对外行为变，所以留在弹框层。 */
+  var noteSec  = 'active';
+  var notePage = 0;
+
   function modalOpen() { return !!el.modal && el.modal.hidden === false; }
 
   function openModal(kind, arg) {
     modalKind = kind || 'spells';
     modalArg  = arg == null ? null : arg;
+    /* 每次打开笔记本都回到第一栏第一页，别续着上次翻到哪 */
+    if (modalKind === 'notebook') { noteSec = 'active'; notePage = 0; }
     /* **先露出来再画** —— renderModal 里有一道"弹框开着才画"的闸，
        顺序反了就会先画一次空内容（写这一轮时踩过）。 */
     el.modal.hidden = false;
@@ -437,7 +454,12 @@ G.ui = (function () {
     if (!modalKind || !modalOpen()) return;
     var v = modalView(modalKind, modalArg);
     el.mTitle.innerHTML = v.title;
-    el.mBody.innerHTML = v.html;
+    if (modalKind === 'notebook') {
+      /* 笔记本要量高度来翻页，不走一锤子的 innerHTML，走专门的渲染 */
+      noteRender();
+    } else {
+      el.mBody.innerHTML = v.html;
+    }
   }
 
   /* 状态 / 技能改了些什么，写成几行（"智力 +2" / "每走一格：生命 -2"）。
@@ -729,30 +751,98 @@ G.ui = (function () {
 
      「可接但还没接」的两栏都不列 —— 那是"还没答应的事"，
      笔记本记的是"在办的"和"办过的"，不是"能办的"。 */
-  function notebookHtml() {
+  /* 当前这栏（进行中 / 已完成）要列的任务。
+     「进行中」= state 是 active；「已完成」= times > 0（交过几次差）。
+     一条可重复任务可能两栏都进 —— 这不是 bug，是它真实的处境。 */
+  function noteList(section) {
+    var out = [];
     var list = G.data.quests || [];
-    var active = [], done = [], i, q;
+    for (var i = 0; i < list.length; i++) {
+      var q = list[i];
+      if (section === 'done') { if (G.quests.times(q.id) > 0) out.push(q); }
+      else                    { if (G.quests.state(q.id) === G.quests.ACTIVE) out.push(q); }
+    }
+    return out;
+  }
 
-    for (i = 0; i < list.length; i++) {
-      q = list[i];
-      if (G.quests.state(q.id) === G.quests.ACTIVE) active.push(q);
-      if (G.quests.times(q.id) > 0) done.push(q);
+  /* 量条目高度，把一栏切成几「页」：每页塞到默认纸面高度为止，多的放下页。
+     返回页码数组 pages[i] = 第 i 页的任务在 items 里的下标集合。 */
+  function notePaginate(items, pageEl) {
+    var cs = window.getComputedStyle(pageEl);
+    var avail = pageEl.clientHeight - (parseFloat(cs.paddingTop) || 0);
+    var kids = pageEl.children, pages = [], cur = [], curH = 0, i;
+    for (i = 0; i < kids.length; i++) {
+      var add = kids[i].offsetHeight;          /* 含条目自己的内边距和分隔线 */
+      if (cur.length && curH + add > avail) { pages.push(cur); cur = []; curH = 0; }
+      cur.push(i); curH += add;
+    }
+    if (cur.length) pages.push(cur);
+    return pages;
+  }
+
+  /* 切栏 / 翻页 的点击入口。data-note 不走 main 的 data-cmd 委托，
+     是弹框自己的控件，所以在这里自己管、自己重画。 */
+  function onNoteClick(kind, arg) {
+    if (kind === 'sec') {
+      noteSec = (arg === 'done') ? 'done' : 'active';
+      notePage = 0;
+    } else if (kind === 'page') {
+      notePage += (arg === '-1') ? -1 : 1;
+    }
+    noteRender();
+  }
+
+  /* 画笔记本：壳（两根书签当页签 + 纸面 + 翻页条），再把当前栏切页装进去。
+     先铺全部任务量高度，再裁到当前页，最后补翻页条 —— 都在同一次渲染里，
+     浏览器只画最后一版，不会有"闪一下整页"的中间态。 */
+  function noteRender() {
+    var items = noteList(noteSec);
+    var shell =
+      '<div class="book">' +
+        '<div class="book-tabs">' +
+          '<button type="button" class="book-tab' + (noteSec === 'active' ? ' on' : '') +
+            '" data-note="sec" data-arg="active">' + esc(G.data.t('modal.note.active')) + '</button>' +
+          '<button type="button" class="book-tab' + (noteSec === 'done' ? ' on' : '') +
+            '" data-note="sec" data-arg="done">' + esc(G.data.t('modal.note.done')) + '</button>' +
+        '</div>' +
+        '<div class="book-pages"><div class="book-page"></div></div>' +
+        '<div class="book-pager"></div>' +
+      '</div>';
+    el.mBody.innerHTML = shell;
+
+    var pageEl = el.mBody.querySelector('.book-page');
+    if (!items.length) {
+      pageEl.innerHTML = '<p class="m-idle slim">' +
+                         esc(G.data.t('modal.note.' + noteSec + '.none')) + '</p>';
+      el.mBody.querySelector('.book-pager').hidden = true;
+      return;
     }
 
-    var html = '<h3 class="m-section">' + esc(G.data.t('modal.note.active')) + '</h3>';
-    if (active.length) {
-      for (i = 0; i < active.length; i++) html += noteQuestHtml(active[i], 'active');
-    } else {
-      html += '<p class="m-idle slim">' + esc(G.data.t('modal.note.active.none')) + '</p>';
-    }
+    var all = '', i;
+    for (i = 0; i < items.length; i++) all += noteQuestHtml(items[i], noteSec);
+    pageEl.innerHTML = all;                    /* 先铺全部，量完高度再裁到当前页 */
 
-    html += '<h3 class="m-section">' + esc(G.data.t('modal.note.done')) + '</h3>';
-    if (done.length) {
-      for (i = 0; i < done.length; i++) html += noteQuestHtml(done[i], 'done');
-    } else {
-      html += '<p class="m-idle slim">' + esc(G.data.t('modal.note.done.none')) + '</p>';
-    }
-    return html;
+    var pages = notePaginate(items, pageEl);
+    if (notePage >= pages.length) notePage = pages.length - 1;   /* 换了栏页码可能越界 */
+
+    var html = '', slice = pages[notePage];
+    for (i = 0; i < slice.length; i++) html += pageEl.children[slice[i]].outerHTML;
+    pageEl.innerHTML = html;
+
+    noteRenderPager(pages.length);
+  }
+
+  function noteRenderPager(total) {
+    var pager = el.mBody.querySelector('.book-pager');
+    if (total <= 1) { pager.hidden = true; return; }     /* 一页装得下就别翻页 */
+    pager.hidden = false;
+    pager.innerHTML =
+      '<button type="button" data-note="page" data-arg="-1"' +
+        (notePage <= 0 ? ' disabled' : '') + '>‹</button>' +
+      '<span class="page-no">' +
+        esc(G.data.t('modal.note.pages', { p: notePage + 1, total: total })) + '</span>' +
+      '<button type="button" data-note="page" data-arg="1"' +
+        (notePage >= total - 1 ? ' disabled' : '') + '>›</button>';
   }
 
   /* 标题 + 正文。状态详情的标题用状态自己的名字（带正负面小标签）——
@@ -780,7 +870,8 @@ G.ui = (function () {
       return { title: esc(G.data.t('modal.wallet.title')), html: walletHtml() };
     }
     if (kind === 'notebook') {
-      return { title: esc(G.data.t('modal.note.title')), html: notebookHtml() };
+      /* 正文不在这画 —— renderModal 对笔记本走 noteRender()（要量高度翻页）。 */
+      return { title: esc(G.data.t('modal.note.title')), html: '' };
     }
     if (kind === 'buff') {
       var rec = null, list = G.statuses.owned();

@@ -164,6 +164,7 @@ G.data.strings = {
   "modal.note.done.none": "还什么都没办成。",
   "modal.note.progress": "{n} / {total}",
   "modal.note.times": "完成 {n} 次",
+  "modal.note.pages": "第 {p} / {total} 页",
 
   "buff.left.step": "还能走 {n} 格",
   "buff.left.time": "还能持续 {n} 秒",

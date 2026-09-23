@@ -1057,6 +1057,109 @@ button:active { transform: translateY(1px); }
    所以那种"跟在标题后面"的空提示用 slim 收一收。 */
 #modal .m-idle.slim { padding: 10px 0; }
 
+/* ---------- 笔记本：一页栏的书 + 两个书签（切栏）+ 翻页 ----------
+
+   上面两根彩色书签 = 「进行中 / 已完成」两栏，点哪根看哪栏；
+   纸面固定默认高度，内容放不下就「翻页」，不滚动。
+   右侧(下面用不到的书脊)不再做两栏摊开。 */
+
+#modal .book {
+  position: relative;
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0)),
+    var(--panel);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 26px rgba(0,0,0,0.35);
+}
+
+/* 书脊 / 页眉：两根书签当页签，选中的亮色、没选中的压暗 */
+#modal .book-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+#modal .book-tab {
+  position: relative;
+  top: 1px;                       /* 让选中那根压住下面的纸面边框 */
+  height: 26px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #06130d;
+  border: 0;
+  cursor: pointer;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), 50% 100%, 0 calc(100% - 8px));
+}
+#modal .book-tab[data-arg="active"] { background: linear-gradient(180deg, #8ff0b8, #5ee39a); }
+#modal .book-tab[data-arg="done"]   { background: linear-gradient(180deg, #90d7ff, #6cc7ff); color: #071420; }
+#modal .book-tab:not(.on) { opacity: 0.45; filter: saturate(0.6); cursor: pointer; }
+#modal .book-tab:not(.on):hover { opacity: 0.85; }
+
+/* 纸面：固定默认高度（宽松，约 7 条），超出走翻页，不滚动 */
+#modal .book-pages { padding: 0 12px; }
+#modal .book-page {
+  height: 340px;
+  overflow: hidden;
+  padding: 12px 6px 0;
+  border-radius: 4px 4px 6px 6px;
+  border-top: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0)),
+    var(--panel-2);
+  /* 左侧一道淡暗影，做出装订起来有"书沟"的感觉 */
+  box-shadow: inset 10px 0 14px -14px rgba(0,0,0,0.5);
+}
+#modal .book-page .m-item {                 /* 纸上的一行，不是卡片 */
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 8px 6px;
+}
+#modal .book-page .m-item + .m-item {
+  margin-top: 0;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+#modal .book-page .m-kind {
+  background: rgba(255,255,255,0.03);
+  border-width: 0;
+}
+
+/* 翻页条：上一页 / 页码 / 下一页 */
+#modal .book-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+#modal .book-pager[hidden] { display: none; }
+#modal .book-pager .page-no {
+  min-width: 72px;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--fg-faint);
+}
+#modal .book-pager button {
+  min-width: 32px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--fg);
+  background: var(--panel-2);
+  border: 1px solid var(--border-2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+#modal .book-pager button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+#modal .book-pager button:disabled { opacity: 0.35; cursor: default; }
+
 /* ---------- 状态详情：四块（描述 / 剩余量 / 影响 / 计时） ---------- */
 
 #modal .m-block { margin-top: 12px; }

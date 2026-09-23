@@ -1423,6 +1423,11 @@
   const backY = G.state.data.world.y;
 
   const modalText = () => $('modal').textContent;
+  /* 笔记本是书签切栏：点哪根看哪栏。测试要切到「已完成」再断言那栏的内容。 */
+  const noteSwitch = (sec) => {
+    const tab = $('modal-body').querySelector('.book-tab[data-arg="' + sec + '"]');
+    if (tab) tab.click();
+  };
   T('弹框默认是关着的', !G.ui.modalOpen() && $('modal').hidden === true);
   T('弹框右上角有关闭按钮，文案来自 strings',
     !!$('modal-close') && $('modal-close').textContent === '关闭');
@@ -2274,6 +2279,7 @@
   T('有「已完成」一栏', modalText().indexOf(G.data.t('modal.note.done')) >= 0);
   T('进行中列着已接的任务', modalText().indexOf('走十步') >= 0);
   T('进行中报进度', modalText().indexOf('0 / 10') >= 0);
+  noteSwitch('done');   /* 切到「已完成」书签再看那一栏 */
   T('已完成列着交过差的任务', modalText().indexOf('搭把手') >= 0);
   T('已完成写的是"完成过几次"（可重复任务能重复出现）',
     modalText().indexOf('完成 2 次') >= 0);
@@ -2348,6 +2354,7 @@
 
   /* 交付之后再翻笔记本，它应该躺在「已完成」那一栏里 */
   G.main.exec('bag', ['use', 'itm_note']);
+  noteSwitch('done');   /* 交付的任务进了「已完成」，切过去才看得到 */
   T('笔记本里出现刚交掉的任务', modalText().indexOf('三株清心草') >= 0);
   T('它躺在「已完成」那一栏', modalText().indexOf('三株清心草') >
     modalText().indexOf(G.data.t('modal.note.done')));
